@@ -6,7 +6,7 @@ mod message;
 mod sidebar;
 pub use chat::{Chat, ChatProps};
 pub use contact::Contact;
-pub use header::{Header, HeaderProps};
+pub use header::Header;
 pub use login::{Login, LoginProps};
 pub use message::{Message, MessageProps};
 pub use sidebar::Sidebar;

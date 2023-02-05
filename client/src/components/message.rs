@@ -8,10 +8,14 @@ pub struct MessageProps {
     pub message: protocol::Message,
 }
 
+#[allow(non_snake_case)]
 pub fn Message(cx: Scope<MessageProps>) -> Element {
     let current_user = use_atom_state(cx, CURRENT_USER);
     let left =
         current_user.current().as_ref().clone().unwrap().username != cx.props.message.from.username;
+    let avatar = cx.props.message.clone().from.avatar.unwrap_or(
+        "https://images.unsplash.com/photo-1549078642-b2ba4bda0cdb?ixlib=rb-1.2.1&amp;ixid=eyJhcHBfaWQiOjEyMDd9&amp;auto=format&amp;fit=facearea&amp;facepad=3&amp;w=144&amp;h=144".to_owned()
+    );
     cx.render(rsx! {
         div {
             class: "chat-message transition-all ease-in-out delay-150",
@@ -39,7 +43,7 @@ pub fn Message(cx: Scope<MessageProps>) -> Element {
                     }
                 }
                 img {
-                    src: "https://images.unsplash.com/photo-1549078642-b2ba4bda0cdb?ixlib=rb-1.2.1&amp;ixid=eyJhcHBfaWQiOjEyMDd9&amp;auto=format&amp;fit=facearea&amp;facepad=3&amp;w=144&amp;h=144", alt:"My profile", class:"w-8 h-8 rounded-full order-1"
+                    src: "{avatar}", alt:"My profile", class:"w-8 h-8 rounded-full order-1"
                 }
             }
         }

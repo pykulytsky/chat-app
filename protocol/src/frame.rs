@@ -1,5 +1,5 @@
 use colored::Colorize;
-use std::{fmt::Display, str::FromStr};
+use std::fmt::Display;
 use termion::{cursor, terminal_size};
 
 use crate::{ConnectionError, ProtocolError, Result};
@@ -12,8 +12,8 @@ use chrono::prelude::*;
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct User {
     pub username: String,
-    pub password: String,
     pub color: Option<String>,
+    pub avatar: Option<String>,
 }
 
 impl Display for User {
@@ -26,16 +26,16 @@ impl Display for User {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Message {
     pub from: User,
-    pub to: Option<Channel>,
+    pub channel: String,
     pub body: String,
     pub created: DateTime<Utc>,
 }
 
 impl Message {
-    pub fn new(from: User, to: Option<Channel>, body: String) -> Self {
+    pub fn new(from: User, channel: String, body: String) -> Self {
         Self {
             from,
-            to,
+            channel,
             body,
             created: Utc::now(),
         }
@@ -63,16 +63,16 @@ impl Display for Message {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Channel {
     pub name: String,
-    pub users: Vec<User>,
     pub messages: Vec<Message>,
+    pub cover: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum Frame {
     Authorize(User),
-    Connect(User, Option<String>),
+    Connect(Vec<Channel>),
     Message(Message),
-    Bulk(Vec<Message>),
+    Bulk(Vec<Message>, Vec<Channel>),
     Channel(Channel),
     Ok,
     Error(String),
@@ -124,11 +124,6 @@ impl TryFrom<Frame> for Message {
     fn try_from(frame: Frame) -> std::result::Result<Self, Self::Error> {
         match frame {
             Frame::Message(msg) => Ok(msg),
-            Frame::Disconnect(user) => Ok(Message::new(
-                user.clone(),
-                None,
-                format!("User {} has left the chat", user.username),
-            )),
             _ => Err(ConnectionError::MessageParse),
         }
     }
@@ -151,20 +146,5 @@ impl TryInto<Bytes> for Frame {
             Ok(bytes) => Ok(Bytes::from(bytes)),
             Err(_) => Err(ConnectionError::MessageParse),
         }
-    }
-}
-
-impl FromStr for Message {
-    type Err = ProtocolError;
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        Ok(Self::new(
-            User {
-                username: "a".to_string(),
-                password: "a".to_string(),
-                color: None,
-            },
-            None,
-            s.to_string(),
-        ))
     }
 }

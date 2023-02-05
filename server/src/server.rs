@@ -14,7 +14,7 @@ use tokio::{
 };
 use tokio_util::codec::{BytesCodec, Framed};
 
-use protocol::{ConnectionError, Frame, Message};
+use protocol::{ConnectionError, Frame, Message, Channel};
 
 pub type Tx = mpsc::UnboundedSender<Message>;
 type Rx = mpsc::UnboundedReceiver<Message>;
@@ -24,8 +24,9 @@ const MAX_CONNECTIONS: usize = 64;
 #[derive(Debug)]
 pub struct Shared {
     pub peers: HashMap<SocketAddr, Tx>,
-    pub messages: Arc<Mutex<Vec<Message>>>,
-    pub max_connetions: Arc<Semaphore>,
+    pub messages: Vec<Message>,
+    pub name: String,
+    pub cover: Option<String>
 }
 
 impl Shared {
@@ -35,11 +36,12 @@ impl Shared {
     ///
     /// assert_eq!(shared.peers.len(), 0);
     /// ```
-    pub fn new() -> Self {
+    pub fn new(name: String, cover: Option<String>) -> Self {
         Shared {
             peers: HashMap::new(),
-            messages: Arc::new(Mutex::new(vec![])),
-            max_connetions: Arc::new(Semaphore::new(MAX_CONNECTIONS)),
+            name,
+            cover,
+            messages: vec![],
         }
     }
 
@@ -64,7 +66,6 @@ impl Peer {
     /// Create a new instance of `Peer`.
     pub async fn new(
         state: Arc<Mutex<HashMap<String, Shared>>>,
-        channel: &str,
         stream: Framed<TcpStream, BytesCodec>,
     ) -> io::Result<Peer> {
         // Get the client socket address
@@ -77,10 +78,12 @@ impl Peer {
         state
             .lock()
             .await
-            .get_mut(channel)
-            .unwrap()
-            .peers
-            .insert(addr, tx);
+            .iter_mut()
+            .for_each(|(_, v)| {
+                v
+                .peers
+                .insert(addr, tx.clone());
+            });
 
         Ok(Peer { stream, rx })
     }
@@ -125,7 +128,8 @@ impl Server {
         let listener = TcpListener::bind(addr).await?;
 
         let mut channels = HashMap::new();
-        channels.insert("default".to_string(), Shared::new());
+        channels.insert("default".to_string(), Shared::new("default".to_string(), None));
+        channels.insert("another".to_string(), Shared::new("another".to_string(), None));
         let channels = Arc::new(Mutex::new(channels));
 
         Ok(Box::leak(Box::new(Server {
@@ -175,25 +179,21 @@ impl Server {
             return Ok(());
         }
 
-        let messages = Arc::clone(&self.messages);
-
-        let (user, channel) = match chat.next().await {
+        let user = match chat.next().await {
             Some(Ok(bytes)) => {
                 let frame: Frame = bytes.freeze().try_into().unwrap();
-                if let Frame::Connect(user, channel) = frame {
-                    let messages = messages.lock().await;
-                    let bytes: Bytes = Frame::Bulk(messages.to_vec()).try_into().unwrap();
-                    chat.send(bytes).await.unwrap();
-                    let channel = match channel {
-                        Some(ch) => {
-                            if !state.lock().await.contains_key(&ch) {
-                                state.lock().await.insert(ch.to_owned(), Shared::new());
-                            }
-                            ch
+                if let Frame::Authorize(user) = frame {
+                    let channels: Vec<Channel> = self.channels.lock().await.iter().map(|(_, v)| {
+                        Channel {
+                            name: v.name.to_owned(),
+                            cover: v.cover.to_owned(),
+                            messages: v.messages.to_owned(),
                         }
-                        None => "default".to_string(),
-                    };
-                    (user, channel)
+                    }).collect();
+                    let bytes: Bytes = Frame::Bulk(vec![], channels).try_into().unwrap();
+                    chat.send(bytes).await.unwrap();
+
+                    user
                 } else {
                     tracing::error!("Failed to get username from {}. Client disconnected.", addr);
                     return Ok(());
@@ -207,24 +207,24 @@ impl Server {
         };
 
         // Register our peer with state which internally sets up some channels.
-        let mut peer = Peer::new(state.clone(), &channel, chat).await?;
+        let mut peer = Peer::new(state.clone(), chat).await?;
 
         // A client has connected, let's let everyone know.
-        {
-            let msg = Message::new(
-                user.clone(),
-                None,
-                format!("{} has joined the chat", user.username),
-            );
-
-            state
-                .lock()
-                .await
-                .get_mut(&channel)
-                .unwrap()
-                .broadcast(addr, &msg)
-                .await;
-        }
+        // {
+        //     let msg = Message::new(
+        //         user.clone(),
+        //         None,
+        //         format!("{} has joined the chat", user.username),
+        //     );
+        //
+        //     state
+        //         .lock()
+        //         .await
+        //         .get_mut(&channel)
+        //         .unwrap()
+        //         .broadcast(addr, &msg)
+        //         .await;
+        // }
 
         // Process incoming messages until our stream is exhausted by a disconnect.
         loop {
@@ -243,9 +243,10 @@ impl Server {
                             let bytes: Bytes = Frame::Message(msg.clone()).try_into().unwrap();
                             peer.stream.send(bytes).await?;
 
-                            state.lock().await.get_mut(&channel).unwrap().broadcast(addr, &msg).await;
-                            let mut messages = messages.lock().await;
-                            messages.push(msg);
+                            state.lock().await.get_mut(&msg.channel).unwrap().broadcast(addr, &msg).await;
+                            state.lock().await.get_mut(&msg.channel).unwrap().messages.push(msg);
+                            // let mut messages = messages.lock().await;
+                            // messages.push(msg);
                         }
                     }
                     // An error occurred.
@@ -264,25 +265,25 @@ impl Server {
 
         // If this section is reached it means that the client was disconnected!
         // Let's let everyone still connected know about it.
-        {
-            state
-                .lock()
-                .await
-                .get_mut(&channel)
-                .unwrap()
-                .peers
-                .remove(&addr);
-
-            let msg = Frame::Disconnect(user);
-            tracing::info!("{}", msg);
-            state
-                .lock()
-                .await
-                .get_mut(&channel)
-                .unwrap()
-                .broadcast(addr, &msg.try_into().unwrap())
-                .await;
-        }
+        // {
+        //     state
+        //         .lock()
+        //         .await
+        //         .get_mut(&channel)
+        //         .unwrap()
+        //         .peers
+        //         .remove(&addr);
+        //
+        //     let msg = Frame::Disconnect(user);
+        //     tracing::info!("{}", msg);
+        //     state
+        //         .lock()
+        //         .await
+        //         .get_mut(&channel)
+        //         .unwrap()
+        //         .broadcast(addr, &msg.try_into().unwrap())
+        //         .await;
+        // }
 
         Ok(())
     }

@@ -2,8 +2,14 @@ use crate::CURRENT_CHANNEL;
 use dioxus::prelude::*;
 use fermi::use_atom_state;
 
+#[allow(non_snake_case)]
 #[inline_props]
-pub fn Contact<'a>(cx: Scope<'a>, name: String, onselect: EventHandler<'a, String>) -> Element<'a> {
+pub fn Contact<'a>(
+    cx: Scope<'a>,
+    name: String,
+    last_message: String,
+    onselect: EventHandler<'a, String>,
+) -> Element<'a> {
     let current_channel = use_atom_state(cx, CURRENT_CHANNEL);
     let class_name: &str = if current_channel.is_some()
         && current_channel.current().as_ref().clone().unwrap() == cx.props.name
@@ -31,7 +37,7 @@ pub fn Contact<'a>(cx: Scope<'a>, name: String, onselect: EventHandler<'a, Strin
                     class: "flex justify-between",
                     span {
                         class: "block ml-2 font-semibold",
-                        "Jhon Done"
+                        "{name}"
                     }
                     span {
                         class: "block ml-2 text-sm",
@@ -40,7 +46,7 @@ pub fn Contact<'a>(cx: Scope<'a>, name: String, onselect: EventHandler<'a, Strin
                 }
                 span {
                     class: "block ml-2 text-sm",
-                    "bye"
+                    "{last_message}"
                 }
             }
 

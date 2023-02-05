@@ -22,7 +22,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
     let user = User {
         username: args.user,
         color: args.color,
-        password: "1234".to_owned(),
+        avatar: Some("https://images.unsplash.com/photo-1675456110416-53a9df455bae?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=687&q=80".to_string())
     };
 
     tokio::spawn(async move {
@@ -33,7 +33,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
                 Frame::Message(message) => {
                     println!("{}\x07", &message);
                 }
-                Frame::Bulk(messages) => {
+                Frame::Bulk(messages, _) => {
                     for message in messages.iter() {
                         println!("{}\x07", &message);
                     }
@@ -49,7 +49,9 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
-    let connect_message = Frame::Connect(user.clone(), args.room);
+    let connect_message = Frame::Authorize(user.clone());
+
+    let room = args.room.unwrap();
 
     let bytes: Bytes = connect_message.try_into().unwrap();
 
@@ -59,7 +61,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
         let mut inp = String::new();
         std::io::stdin().read_line(&mut inp).unwrap();
         let inp = inp.trim().to_owned();
-        let message = Frame::Message(Message::new(user.clone(), None, inp));
+        let message = Frame::Message(Message::new(user.clone(), room.to_owned(), inp));
 
         let bytes: Bytes = message.try_into().unwrap();
         let _ = sink.send(bytes).await;

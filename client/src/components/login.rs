@@ -1,9 +1,10 @@
 use dioxus::prelude::*;
 
+#[allow(non_snake_case)]
 #[inline_props]
 pub fn Login<'a>(cx: Scope<'a>, onsubmit: EventHandler<'a, (String, String)>) -> Element<'a> {
     let username = use_state(cx, String::new);
-    let password = use_state(cx, String::new);
+    let avatar = use_state(cx, String::new);
     cx.render(rsx! {
         div {
             class: "inset-0 fixed pin flex items-center",
@@ -48,23 +49,23 @@ pub fn Login<'a>(cx: Scope<'a>, onsubmit: EventHandler<'a, (String, String)>) ->
                                 class: "mb-6",
                                 label {
                                     class: "block text-sm font-bold mb-2",
-                                    "for": "password",
-                                    "Password"
+                                    "for": "avatar",
+                                    "Avatar"
                                 }
                                 input {
                                     class: "shadow appearance-none border rounded w-full py-2 px-3 text-grey-darker mb-3",
-                                    id: "password",
-                                    "type": "password",
-                                    placeholder: "Enter your password",
-                                    value: "{password}",
-                                    oninput: move |evt| password.set(evt.value.clone()),
+                                    id: "avatar",
+                                    "type": "text",
+                                    placeholder: "Enter link to your avatar",
+                                    value: "{avatar}",
+                                    oninput: move |evt| avatar.set(evt.value.clone()),
                                 }
                             }
                             div {
                                 class: "mb-6 flex justify-center",
                                 button {
                                     class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded",
-                                    onclick: move |_| onsubmit.call((username.clone().to_string(), password.clone().to_string())),
+                                    onclick: move |_| onsubmit.call((username.clone().to_string(), avatar.clone().to_string())),
                                     "Login"
                                 }
                             }

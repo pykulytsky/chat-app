@@ -8,7 +8,7 @@ use tokio::{net::TcpStream, select};
 use tokio_util::codec::{BytesCodec, Framed};
 
 use bytes::Bytes;
-use protocol::{Frame, Message, User};
+use protocol::{Frame, Message, User, Channel};
 use fermi::prelude::*;
 
 use tokio::sync::Notify;
@@ -20,22 +20,24 @@ fn main() {
     dioxus_desktop::launch(app);
 }
 
-type MessagesStorage = HashMap<String, Vec<Message>>;
-
 pub static CURRENT_USER: Atom<Option<User>> = |_| None;
 pub static CURRENT_CHANNEL: Atom<Option<String>> = |_| None;
 pub static MESSAGES: Atom<Vec<Message>> = |_| Vec::new();
+pub static CHANNELS: Atom<HashMap<String, Channel>> = |_| HashMap::new();
 
 fn app(cx: Scope) -> Element {
     use_init_atom_root(cx);
     let user = use_atom_state(cx, CURRENT_USER);
     let channel = use_atom_state(cx, CURRENT_CHANNEL);
+    let channels = use_atom_state(cx, CHANNELS);
+    let channels_state = use_state(cx, HashMap::<String, Channel>::new);
+    let channels_state_clone = channels_state.clone();
 
     let notify = Arc::new(Notify::new());
     let block = notify.clone();
 
-    let messages = use_state(cx, Vec::<Message>::new);
-    let values = messages.clone();
+    let chnls = channels.clone();
+    let chnls1 = channels.clone();
     let message = use_state(cx, String::new);
 
     let server_tx = use_coroutine(&cx, |mut rx: UnboundedReceiver<Frame>| async move {
@@ -46,9 +48,8 @@ fn app(cx: Scope) -> Element {
 
         let login_frame = block_on(rx.next()).unwrap();
 
-        if let Frame::Authorize(user) = login_frame {
-            let connect_message = Frame::Connect(user.clone(), Some("test".to_string()));
-            let bytes: Bytes = connect_message.try_into().unwrap();
+        if let Frame::Authorize(_) = login_frame {
+            let bytes: Bytes = login_frame.try_into().unwrap();
             let _ = sink.send(bytes).await;
         } else {
             println!("wrong");
@@ -65,15 +66,26 @@ fn app(cx: Scope) -> Element {
                         let message: Frame = msg.freeze().try_into().unwrap();
                         match message {
                             Frame::Message(message) => {
-                                let values = values.clone();
-                                values.with_mut(|v| {
-                                    v.push(message);
+                                let channels = channels_state_clone.clone();
+                                // chnls1.with_mut(|chnls| {
+                                //     chnls.get_mut(&message.channel).unwrap().messages.push(message);
+                                // });
+                                channels.with_mut(|chnls| {
+                                    chnls.get_mut(&message.channel).unwrap().messages.push(message);
                                 });
+                                chnls1.set(HashMap::from_iter(channels.current().clone().iter().map(|ch| (ch.0.to_owned(), ch.1.clone()))));
                             },
-                            Frame::Bulk(messages) => {
-                                let values = values.clone();
-                                values.with_mut(|v| {
-                                    v.extend_from_slice(&messages);
+                            Frame::Bulk(_, chnls) => {
+                                let channels = channels_state_clone.clone();
+                                chnls1.with_mut(|chnl| {
+                                    chnl.extend(chnls.iter().map(|ch| {
+                                        (ch.name.to_owned(), ch.clone())
+                                    }));
+                                });
+                                channels.with_mut(|chnl| {
+                                    chnl.extend(chnls.iter().map(|ch| {
+                                        (ch.name.to_owned(), ch.clone())
+                                    }));
                                 });
                             },
                             Frame::Error(_) => {
@@ -94,14 +106,12 @@ fn app(cx: Scope) -> Element {
 
     let tx1 = server_tx.clone();
     let login_tx = server_tx.clone();
-
+    
     let chat = if channel.current().is_some() {
         cx.render(rsx!{
-            Header {
-                score: 1
-            }
+            Header { }
             Chat {
-                messages: messages.clone().to_vec()
+                messages: chnls.clone().current().get(channel.as_ref().unwrap()).unwrap().messages.clone()
             }
 
         div {
@@ -123,7 +133,7 @@ fn app(cx: Scope) -> Element {
 
                             let message = Frame::Message(Message::new(
                                 user.as_ref().unwrap().clone(),
-                                None,
+                                channel.as_ref().unwrap().clone(),
                                 message.clone().to_string()
                             ));
                             tx1.send(message)
@@ -153,11 +163,11 @@ fn app(cx: Scope) -> Element {
         cx.render(rsx! {
             style { include_str!("../css/tailwind_compiled.css") }
             Login {
-                onsubmit: move |(username, password)| {
+                onsubmit: move |(username, avatar)| {
                     let logged_in = User {
                         username,
-                        password,
-                        color: None
+                        color: None,
+                        avatar: Some(avatar),
                     };
                     user.modify(|_| Some(logged_in.clone()));
                     login_tx.send(Frame::Authorize(logged_in));
@@ -170,7 +180,7 @@ fn app(cx: Scope) -> Element {
             style { include_str!("../css/tailwind_compiled.css") }
             
             Sidebar {
-                onselect: move |v| { }
+                onselect: move |_| { }
             }
             div {
                 class: "ml-64 flex-1 p:2 sm:p-6 justify-between flex flex-col h-screen",

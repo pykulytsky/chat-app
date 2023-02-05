@@ -1,11 +1,13 @@
 use dioxus::prelude::*;
+use fermi::use_atom_state;
 
-#[derive(PartialEq, Props)]
-pub struct HeaderProps {
-    pub score: i32,
-}
+use crate::CURRENT_CHANNEL;
 
-pub fn Header(cx: Scope<HeaderProps>) -> Element {
+#[allow(non_snake_case)]
+pub fn Header(cx: Scope) -> Element {
+    let current_channel = use_atom_state(cx, CURRENT_CHANNEL);
+    let channel = current_channel.clone();
+    let current_channel = channel.as_ref().unwrap();
     cx.render(rsx! {
             div {
                 class: "flex sm:items-center justify-between py-3 px-6 border-b-2 border-gray-200 sticky",
@@ -35,15 +37,11 @@ pub fn Header(cx: Scope<HeaderProps>) -> Element {
                     div {
                         class: "flex flex-col leading-tight",
                         div {
-                            class: "text-2xl mt-1 flex items-center",
+                            class: "text-2xl mt-1 flex items-center ml-6",
                             span {
                                 class: "text-gray-700 mr-3",
-                                "Oleh Pykulytsky"
+                                "{current_channel}"
                             }
-                        }
-                        span {
-                            class: "text-lg text-gray-600",
-                            "test"
                         }
                     }
                 }
