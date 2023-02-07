@@ -67,7 +67,7 @@ pub struct Channel {
     pub cover: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub enum Frame {
     Authorize(User),
     Connect(Vec<Channel>),

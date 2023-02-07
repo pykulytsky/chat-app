@@ -1,3 +1,4 @@
+mod channel_form;
 mod chat;
 mod contact;
 mod header;

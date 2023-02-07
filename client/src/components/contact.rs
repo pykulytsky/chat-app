@@ -7,7 +7,9 @@ use fermi::use_atom_state;
 pub fn Contact<'a>(
     cx: Scope<'a>,
     name: String,
+    cover: String,
     last_message: String,
+    dt: String,
     onselect: EventHandler<'a, String>,
 ) -> Element<'a> {
     let current_channel = use_atom_state(cx, CURRENT_CHANNEL);
@@ -28,7 +30,7 @@ pub fn Contact<'a>(
             },
             img {
                 class: "object-cover w-10 h-10 rounded-full",
-                src: "https://cdn.pixabay.com/photo/2018/09/12/12/14/man-3672010__340.jpg",
+                src: "{cover}",
                 alt: ""
             }
             div {
@@ -41,7 +43,7 @@ pub fn Contact<'a>(
                     }
                     span {
                         class: "block ml-2 text-sm",
-                        "25 min"
+                        "{dt}"
                     }
                 }
                 span {

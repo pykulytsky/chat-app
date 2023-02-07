@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use dioxus::prelude::*;
 
-use components::{Chat, Header, Login, Sidebar};
+use components::{Chat, Login, Sidebar};
 use futures::{SinkExt, StreamExt, executor::block_on};
 use tokio::{net::TcpStream, select};
 use tokio_util::codec::{BytesCodec, Framed};
@@ -106,10 +106,14 @@ fn app(cx: Scope) -> Element {
 
     let tx1 = server_tx.clone();
     let login_tx = server_tx.clone();
+    let sidebar_tx = server_tx.clone();
     
     let chat = if channel.current().is_some() {
         cx.render(rsx!{
-            Header { }
+            // Header {
+            //     name: channel.as_ref().unwrap().to_string(),
+            //     cover: chnls.clone().current().get(channel.as_ref().unwrap()).unwrap().cover.clone().unwrap().to_string()
+            // }
             Chat {
                 messages: chnls.clone().current().get(channel.as_ref().unwrap()).unwrap().messages.clone()
             }
@@ -163,11 +167,15 @@ fn app(cx: Scope) -> Element {
         cx.render(rsx! {
             style { include_str!("../css/tailwind_compiled.css") }
             Login {
-                onsubmit: move |(username, avatar)| {
+                onsubmit: move |(username, avatar): (String, String)| {
                     let logged_in = User {
                         username,
                         color: None,
-                        avatar: Some(avatar),
+                        avatar: if avatar.len() > 0 {
+                            Some(avatar)
+                        } else {
+                            Some("https://w7.pngwing.com/pngs/754/2/png-transparent-samsung-galaxy-a8-a8-user-login-telephone-avatar-pawn-blue-angle-sphere-thumbnail.png".to_string())
+                        },
                     };
                     user.modify(|_| Some(logged_in.clone()));
                     login_tx.send(Frame::Authorize(logged_in));
@@ -180,7 +188,17 @@ fn app(cx: Scope) -> Element {
             style { include_str!("../css/tailwind_compiled.css") }
             
             Sidebar {
-                onselect: move |_| { }
+                onselect: move |_| { },
+                onsubmit: move |(name, cover): (String, String)| {
+                    let channel = Frame::Channel(Channel {
+                        name,
+                        cover: if cover.len() > 0 {Some(cover)} else {
+                            Some("https://cdn-icons-png.flaticon.com/512/134/134932.png".to_string())
+                        },
+                        messages: vec![]
+                    });
+                    sidebar_tx.send(channel);
+                }
             }
             div {
                 class: "ml-64 flex-1 p:2 sm:p-6 justify-between flex flex-col h-screen",
