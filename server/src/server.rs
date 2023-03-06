@@ -14,7 +14,7 @@ use tokio::{
 };
 use tokio_util::codec::{BytesCodec, Framed};
 
-use protocol::{ConnectionError, Frame, Message, Channel};
+use protocol::{Channel, ConnectionError, Frame, Message};
 
 pub type Tx = mpsc::UnboundedSender<Frame>;
 type Rx = mpsc::UnboundedReceiver<Frame>;
@@ -26,7 +26,7 @@ pub struct Shared {
     pub peers: HashMap<SocketAddr, Tx>,
     pub messages: Vec<Message>,
     pub name: String,
-    pub cover: Option<String>
+    pub cover: Option<String>,
 }
 
 impl Shared {
@@ -84,15 +84,9 @@ impl Peer {
         let (tx, rx) = mpsc::unbounded_channel();
 
         // Add an entry for this `Peer` in the shared state map.
-        state
-            .lock()
-            .await
-            .iter_mut()
-            .for_each(|(_, v)| {
-                v
-                .peers
-                .insert(addr, tx.clone());
-            });
+        state.lock().await.iter_mut().for_each(|(_, v)| {
+            v.peers.insert(addr, tx.clone());
+        });
 
         Ok(Peer { stream, rx })
     }
@@ -123,14 +117,20 @@ impl Server {
         let listener = TcpListener::bind(addr).await?;
 
         let mut channels = HashMap::new();
-        channels.insert("default".to_string(), Shared::new(
+        channels.insert(
+            "default".to_string(),
+            Shared::new(
                 "default".to_string(),
-                Some("https://cdn-icons-png.flaticon.com/512/134/134932.png".to_string())
-        ));
-        channels.insert("another".to_string(), Shared::new(
+                Some("https://cdn-icons-png.flaticon.com/512/134/134932.png".to_string()),
+            ),
+        );
+        channels.insert(
+            "another".to_string(),
+            Shared::new(
                 "another".to_string(),
-                Some("https://cdn-icons-png.flaticon.com/512/134/134932.png".to_string())
-        ));
+                Some("https://cdn-icons-png.flaticon.com/512/134/134932.png".to_string()),
+            ),
+        );
         let channels = Arc::new(Mutex::new(channels));
 
         Ok(Box::leak(Box::new(Server {
@@ -184,13 +184,17 @@ impl Server {
             Some(Ok(bytes)) => {
                 let frame: Frame = bytes.freeze().try_into().unwrap();
                 if let Frame::Authorize(user) = frame {
-                    let channels: Vec<Channel> = self.channels.lock().await.iter().map(|(_, v)| {
-                        Channel {
+                    let channels: Vec<Channel> = self
+                        .channels
+                        .lock()
+                        .await
+                        .iter()
+                        .map(|(_, v)| Channel {
                             name: v.name.to_owned(),
                             cover: v.cover.to_owned(),
                             messages: v.messages.to_owned(),
-                        }
-                    }).collect();
+                        })
+                        .collect();
                     let bytes: Bytes = Frame::Bulk(vec![], channels).try_into().unwrap();
                     chat.send(bytes).await.unwrap();
 
@@ -243,7 +247,7 @@ impl Server {
                             },
                             Frame::Channel(channel) => {
                                 let name = &channel.name.to_owned();
-                                
+
                                 let peers: HashMap<SocketAddr, Tx>  = state
                                     .lock()
                                     .await
@@ -251,7 +255,7 @@ impl Server {
                                     .unwrap()
                                     .peers
                                     .iter()
-                                    .map(|(addr, tx)| (addr.clone(), tx.clone()))
+                                    .map(|(addr, tx)| (*addr, tx.clone()))
                                     .collect();
                                 state
                                     .lock()
@@ -259,13 +263,13 @@ impl Server {
                                     .insert(
                                         name.to_string(),
                                         Shared::with_peers(
-                                            name.to_string(), 
+                                            name.to_string(),
                                             channel.cover.to_owned(),
                                             peers
                                         )
                                     );
 
-                                
+
                                 let channels: Vec<Channel> = self.channels.lock().await.iter().map(|(_, v)| {
                                     Channel {
                                         name: v.name.to_owned(),

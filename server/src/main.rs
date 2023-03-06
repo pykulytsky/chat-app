@@ -3,7 +3,7 @@ use std::error::Error;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let server = Server::bind("127.0.0.1:9999").await.unwrap();
+    let server = Server::bind("127.0.0.1:9999").await?;
     server.run().await?;
     Ok(())
 }

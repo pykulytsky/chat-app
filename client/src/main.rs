@@ -3,16 +3,16 @@ use std::collections::HashMap;
 use dioxus::prelude::*;
 
 use components::{Chat, Login, Sidebar};
-use futures::{SinkExt, StreamExt, executor::block_on};
+use futures::{executor::block_on, SinkExt, StreamExt};
 use tokio::{net::TcpStream, select};
 use tokio_util::codec::{BytesCodec, Framed};
 
 use bytes::Bytes;
-use protocol::{Frame, Message, User, Channel};
 use fermi::prelude::*;
+use protocol::{Channel, Frame, Message, User};
 
-use tokio::sync::Notify;
 use std::sync::Arc;
+use tokio::sync::Notify;
 
 mod components;
 
@@ -107,7 +107,7 @@ fn app(cx: Scope) -> Element {
     let tx1 = server_tx.clone();
     let login_tx = server_tx.clone();
     let sidebar_tx = server_tx.clone();
-    
+
     let chat = if channel.current().is_some() {
         cx.render(rsx!{
             // Header {
@@ -185,8 +185,7 @@ fn app(cx: Scope) -> Element {
         })
     } else {
         cx.render(rsx! (
-            style { include_str!("../css/tailwind_compiled.css") }
-            
+            style   { include_str!("../css/tailwind_compiled.css") }
             Sidebar {
                 onselect: move |_| { },
                 onsubmit: move |(name, cover): (String, String)| {
